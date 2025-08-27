@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>PolymerLabs.Result</RootNamespace>
-    <Description>Rust-like Result types in .NET</Description>
+    <Description>Implementation of Result types in .NET</Description>
     <Authors>
       PolymerLabs
     </Authors>
