@@ -38,6 +38,29 @@ public class ValueResultUnitTests
   }
 
   [Test]
+  public void ValueResult_When_ValueSetWhenNotExplicitlySetInOk()
+  {
+    const int okValue = 10;
+    const int errorValue = 10;
+    var okResult = ValueResult<int, TestError>.Ok(okValue);
+    var errorResult = ValueResult<int, TestError>.Error(TestError.FirstError);
+
+    var okMatchResult = okResult.When(
+      _ => { },
+      _ => errorValue);
+
+    var errorMatchResult = errorResult.When(
+      _ => { },
+      _ => errorValue);
+
+    Assert.Multiple(() =>
+    {
+      Assert.That(okMatchResult, Is.EqualTo(okValue));
+      Assert.That(errorMatchResult, Is.EqualTo(errorValue));
+    });
+  }
+
+  [Test]
   public void ValueResult_When_DoesPassThroughValueAndError()
   {
     const int okSetValue = 20;

@@ -31,10 +31,27 @@ public readonly struct ValueResult<TValue, TError>
   /// </summary>
   /// <param name="ok">Function to invoke if the result is Ok; if called, it's result is returned.</param>
   /// <param name="error">Function to invoke if the result is Error; if called, it's result is returned.</param>
-  /// <returns>The <see cref="TValue" /> returned by appropriate evaluator.</returns>
+  /// <returns>The <see cref="TValue" /> returned by the appropriate evaluator.</returns>
   public TValue When(Func<TValue, TValue> ok, Func<TError, TValue> error)
   {
     return _ok ? ok(_value) : error(_error);
+  }
+
+  /// <summary>
+  ///   Invokes one of two evaluators depending on whether this <see cref="ValueResult{TValue,TError}" /> is Ok or Error.
+  /// </summary>
+  /// <param name="ok">Function to invoke if the result is Ok.</param>
+  /// <param name="error">Function to invoke if the result is Error; if called, it's result is returned.</param>
+  /// <returns>The <see cref="TValue" /> of the result, or in the case of Error, the result from the Error function.</returns>
+  public TValue When(Action<TValue> ok, Func<TError, TValue> error)
+  {
+    if (!_ok)
+    {
+      return error(_error);
+    }
+
+    ok(_value);
+    return _value;
   }
 
   /// <summary>
@@ -43,7 +60,7 @@ public readonly struct ValueResult<TValue, TError>
   /// </summary>
   /// <param name="ok">Function to invoke if the result is Ok; if called, it's result is returned.</param>
   /// <param name="error">Function to invoke if the result is Error; if called, it's result is returned.</param>
-  /// <returns>The <see cref="TResult" /> returned by appropriate evaluator.</returns>
+  /// <returns>The <see cref="TResult" /> returned by the appropriate evaluator.</returns>
   public TResult When<TResult>(Func<TValue, TResult> ok, Func<TError, TResult> error)
   {
     return _ok ? ok(_value) : error(_error);
