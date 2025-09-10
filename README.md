@@ -21,21 +21,28 @@ TODO
 The following example demonstrates a validation method with multiple discrete checks. Each failure case returns a descriptive error message, while success returns a valueless `Ok`.
 
 ```cs
-public static Result<string> ValidateUsername(string username)
+public enum ValidationError
+{
+  TooLong,
+  TooShort,
+  InvalidCharacter
+}
+
+public static Result<ValidationError> ValidateUsername(string username)
 {
   // Implicit error (recommended): string is automatically converted to Result<string>.
-  if (username.Length > 10) return "Username too long";
+  if (username.Length > 10) return ValidationError.TooLong;
 
   // Explicit error: inferred from the argument type.
-  if (username.Length < 2) return Result.Error("Username too short");
+  if (username.Length < 2) return ValidationError.TooShort;
 
-  // Fully explicit error (rarely needed; verbose).
-  if (username.StartsWith('-')) return Result.Error<string>("Username cannot start with -");
+  // Fully explicit error, typically not required.
+  if (username.StartsWith('-')) return ValidationError.InvalidCharacter;
 
   // Success (recommended): implicit Ok.
   return Result.Ok;
 
-  // Fully explicit Ok (rarely needed; verbose).
+  // Fully explicit Ok, typically not required.
   // return Result<string>.Ok();
 }
 ```
