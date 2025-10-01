@@ -1,120 +1,383 @@
+﻿using System.Diagnostics;
+using System.Runtime.CompilerServices;
+
 namespace PolymerLabs.Result;
 
 /// <summary>
-///   Utility that provides the capability to return a successful result, or in the case of failure, a failure reason.
+///   The result of an operation.
 /// </summary>
-/// <typeparam name="TError">The type of the Error result.</typeparam>
-public readonly struct Result<TError>
+public readonly struct Result
 {
-  private readonly TError _error;
-  private readonly bool _ok;
+  private readonly Outcome _outcome;
 
-  public Result()
+  private Result(Outcome outcome)
   {
-    _error = default!;
-    _ok = true;
-  }
-
-  private Result(TError error)
-  {
-    _error = error;
-    _ok = false;
+    _outcome = outcome;
   }
 
   /// <summary>
-  ///   Invokes one of two functions depending on whether this <see cref="Result" /> is Ok or Error.
+  ///   Handler in the case of an <see cref="Outcome.Error" /> outcome.
   /// </summary>
-  /// <param name="ok">Function to invoke if the result is Ok.</param>
-  /// <param name="error">Function to invoke if the result is Error.</param>
-  public void When(Action ok, Action<TError> error)
+  /// <param name="handler">Action to perform on an Error result.</param>
+  [DebuggerStepThrough]
+  public OkStage OnError(Action handler)
   {
-    if (_ok)
+    if (_outcome == Outcome.Error) handler();
+
+    return new OkStage(this);
+  }
+
+  /// <summary>
+  ///   Async handler in the case of an <see cref="Outcome.Error" /> outcome.
+  /// </summary>
+  /// <param name="handler">Action to perform on an Error result.</param>
+  /// <param name="cancellationToken">The cancellation token.</param>
+  [DebuggerStepThrough]
+  public async Task<OkStage> OnErrorAsync(Func<Task> handler,
+    CancellationToken cancellationToken = default)
+  {
+    if (_outcome != Outcome.Error) return new OkStage(this);
+
+    cancellationToken.ThrowIfCancellationRequested();
+    await handler().ConfigureAwait(false);
+
+    return new OkStage(this);
+  }
+
+  /// <summary>
+  ///   Represents an Ok <see cref="Result" /> or <see cref="Result{T}" />.
+  /// </summary>
+  /// <returns><see cref="OkResult" /> that is implicitly castable to a <see cref="Result" /> or <see cref="Result{T}" />.</returns>
+  public static OkResult Ok { get; } = new();
+
+  /// <summary>
+  ///   Represents an Error <see cref="Result" />.
+  /// </summary>
+  /// <returns><see cref="ErrorResult" /> that is implicitly castable to a <see cref="Result" />.</returns>
+  public static ErrorResult Error { get; } = new();
+
+  // Convert Ok to an Ok result.
+  public static implicit operator Result(OkResult _)
+  {
+    return new Result(Outcome.Ok);
+  }
+
+  // Convert Error to an Error result.
+  public static implicit operator Result(ErrorResult _)
+  {
+    return new Result(Outcome.Error);
+  }
+
+  /// <summary>
+  ///   Stage for handling the Ok outcome of a <see cref="Result" />.
+  /// </summary>
+  public readonly struct OkStage(Result result)
+  {
+    /// <summary>
+    ///   Handler for the case of an <see cref="Outcome.Ok" /> outcome.
+    /// </summary>
+    /// <param name="handler">Action to perform on an Ok result.</param>
+    [DebuggerStepThrough]
+    public void OnOk(Action handler)
     {
-      ok();
+      if (result._outcome != Outcome.Ok) return;
+
+      handler();
     }
-    else
+
+    /// <summary>
+    ///   Async handler for the case of an <see cref="Outcome.Ok" /> outcome.
+    /// </summary>
+    /// <param name="handler">Action to perform on an Ok result.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    [DebuggerStepThrough]
+    public Task OnOkAsync(Func<Task> handler, CancellationToken cancellationToken = default)
     {
-      error(_error);
+      if (result._outcome != Outcome.Ok) return Task.CompletedTask;
+
+      cancellationToken.ThrowIfCancellationRequested();
+      return handler();
     }
+  }
+}
+
+/// <summary>
+///   The result of an operation. If the operation failed, a failure reason is given.
+/// </summary>
+/// <typeparam name="TReason">The type of the error reason.</typeparam>
+public readonly struct Result<TReason>
+{
+  private readonly TReason _reason;
+  private readonly Outcome _outcome;
+
+  private Result(TReason reason)
+  {
+    _reason = reason;
+    _outcome = Outcome.Error;
   }
 
   /// <summary>
-  ///   Invokes a function when this <see cref="Result" /> is Error. If calling a function for both Ok and Error, prefer
-  ///   <see cref="When" />.
+  ///   Handler in the case of an <see cref="Outcome.Error" /> outcome.
   /// </summary>
-  /// <param name="error">Function to invoke if the result is Error.</param>
-  public void WhenError(Action<TError> error)
+  /// <param name="handler">Action to perform on an Error result. The failure reason is provided through a parameter.</param>
+  [DebuggerStepThrough]
+  public OkStage OnError(Action<TReason> handler)
   {
-    if (!_ok)
+    if (_outcome == Outcome.Error) handler(_reason);
+
+    return new OkStage(this);
+  }
+
+  /// <summary>
+  ///   Async handler in the case of an <see cref="Outcome.Error" /> outcome.
+  /// </summary>
+  /// <param name="handler">Action to perform on an Error result.</param>
+  /// <param name="cancellationToken">The cancellation token.</param>
+  [DebuggerStepThrough]
+  public async Task<OkStage> OnErrorAsync(Func<TReason, Task> handler, CancellationToken cancellationToken = default)
+  {
+    if (_outcome != Outcome.Error) return new OkStage(this);
+
+    cancellationToken.ThrowIfCancellationRequested();
+    await handler(_reason).ConfigureAwait(false);
+
+    return new OkStage(this);
+  }
+
+  /// <summary>
+  ///   Represents an Error <see cref="Result{T}" />.
+  /// </summary>
+  /// <param name="reason">The reason for the failure.</param>
+  /// <returns>An Error <see cref="Result{T}" /> with a reason for the failure.</returns>
+  public static Result<TReason> Error(TReason reason)
+  {
+    return new Result<TReason>(reason);
+  }
+
+  // Convert an Ok to an Ok result.
+  public static implicit operator Result<TReason>(OkResult _)
+  {
+    return new Result<TReason>();
+  }
+
+  // Convert a reason to an Error result.
+  public static implicit operator Result<TReason>(TReason reason)
+  {
+    return new Result<TReason>(reason);
+  }
+
+  /// <summary>
+  ///   Stage for handling the Ok outcome of a <see cref="Result{T}" />.
+  /// </summary>
+  public readonly struct OkStage(Result<TReason> result)
+  {
+    /// <summary>
+    ///   Handler for the case of an <see cref="Outcome.Ok" /> outcome.
+    /// </summary>
+    /// <param name="handler">Action to perform on an Ok result.</param>
+    [DebuggerStepThrough]
+    public void OnOk(Action handler)
     {
-      error(_error);
+      if (result._outcome != Outcome.Ok) return;
+
+      handler();
+    }
+
+    /// <summary>
+    ///   Async handler for the case of an <see cref="Outcome.Ok" /> outcome.
+    /// </summary>
+    /// <param name="handler">Action to perform on an Ok result.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    [DebuggerStepThrough]
+    public Task OnOkAsync(Func<Task> handler, CancellationToken cancellationToken = default)
+    {
+      if (result._outcome != Outcome.Ok) return Task.CompletedTask;
+
+      cancellationToken.ThrowIfCancellationRequested();
+      return handler();
     }
   }
+}
 
-  /// <summary>
-  ///   Create an Ok result.
-  /// </summary>
-  /// <typeparam name="TError">The type of the error.</typeparam>
-  /// <returns>An Ok result.</returns>
-  public static Result<TError> Ok()
+/// <summary>
+///   The result of an operation that returns a value. If the operation failed, a failure reason is given.
+/// </summary>
+/// <typeparam name="TReason">The type of the error reason.</typeparam>
+/// <typeparam name="TValue">The type of the returned value.</typeparam>
+public readonly struct Result<TReason, TValue>
+{
+  private readonly TValue _value;
+  private readonly TReason _reason;
+  private readonly Outcome _outcome;
+
+  private Result(TValue value)
   {
-    return new Result<TError>();
+    _value = value;
+    _reason = default!;
+    _outcome = Outcome.Ok;
+  }
+
+  private Result(TReason reason)
+  {
+    _value = default!;
+    _reason = reason;
+    _outcome = Outcome.Error;
   }
 
   /// <summary>
-  ///   Create an Ok result.
+  ///   Handler in the case of an <see cref="Outcome.Error" /> outcome.
   /// </summary>
-  /// <param name="error">The error.</param>
-  /// <typeparam name="TError">The type of the error.</typeparam>
-  /// <returns>An Ok result.</returns>
-  public static Result<TError> Error(TError error)
+  /// <param name="handler">Action to perform on an Error result. The parameter is the failure reason.</param>
+  [DebuggerStepThrough]
+  public OkStage OnError(Action<TReason> handler)
   {
-    return new Result<TError>(error);
+    if (_outcome == Outcome.Error) handler(_reason);
+
+    return new OkStage(this);
   }
 
-  // Convert the Ok enum to an Ok result.
-  public static implicit operator Result<TError>(OkResult _)
+  /// <summary>
+  ///   Handler in the case of an <see cref="Outcome.Error" /> outcome.
+  /// </summary>
+  /// <param name="handler">
+  ///   Action to perform on an Error result. The parameter is the failure reason, and in the case of an
+  ///   <see cref="Outcome.Error" /> outcome the return value will be passed back to the caller.
+  /// </param>
+  /// <typeparam name="TResultValue">Type of the value passed back to the caller.</typeparam>
+  [DebuggerStepThrough]
+  public OkWithDefaultStage<TResultValue> OnError<TResultValue>(Func<TReason, TResultValue> handler)
   {
-    return Ok();
+    TResultValue defaultValue = default!;
+    if (_outcome == Outcome.Error) defaultValue = handler(_reason);
+
+    return new OkWithDefaultStage<TResultValue>(this, defaultValue);
+  }
+
+  /// <summary>
+  ///   Async handler in the case of an <see cref="Outcome.Error" /> outcome.
+  /// </summary>
+  /// <param name="handler">
+  ///   Action to perform on an Error result. The parameter is the failure reason, and in the case of an
+  ///   <see cref="Outcome.Error" /> outcome the return value will be passed back to the caller.
+  /// </param>
+  /// <param name="cancellationToken">The cancellation token.</param>
+  /// <typeparam name="TResultValue">Type of the value passed back to the caller.</typeparam>
+  [DebuggerStepThrough]
+  public async Task<OkWithDefaultStage<TResultValue>> OnErrorAsync<TResultValue>(
+    Func<TReason, Task<TResultValue>> handler, CancellationToken cancellationToken = default)
+  {
+    TResultValue defaultValue = default!;
+    if (_outcome != Outcome.Error) return new OkWithDefaultStage<TResultValue>(this, defaultValue);
+
+    cancellationToken.ThrowIfCancellationRequested();
+    defaultValue = await handler(_reason).ConfigureAwait(false);
+
+    return new OkWithDefaultStage<TResultValue>(this, defaultValue);
+  }
+
+  /// <summary>
+  ///   Async handler in the case of an <see cref="Outcome.Error" /> outcome.
+  /// </summary>
+  /// <param name="handler">Action to perform on an Error result. The parameter is the failure reason.</param>
+  /// <param name="cancellationToken">The cancellation token.</param>
+  [DebuggerStepThrough]
+  public async Task<OkStage> OnErrorAsync(Func<TReason, Task> handler, CancellationToken cancellationToken = default)
+  {
+    if (_outcome != Outcome.Error) return new OkStage(this);
+
+    cancellationToken.ThrowIfCancellationRequested();
+    await handler(_reason).ConfigureAwait(false);
+
+    return new OkStage(this);
+  }
+
+  // Convert a value of type TOk to an Ok result.
+  public static implicit operator Result<TReason, TValue>(TValue value)
+  {
+    return new Result<TReason, TValue>(value);
   }
 
   // Convert a value of type TError to an Error result.
-  public static implicit operator Result<TError>(TError reason)
+  public static implicit operator Result<TReason, TValue>(TReason reason)
   {
-    return Error(reason);
+    return new Result<TReason, TValue>(reason);
+  }
+
+  /// <summary>
+  ///   Stage for handling the Ok outcome of a <see cref="Result{T, T}" />.
+  /// </summary>
+  public readonly struct OkStage(Result<TReason, TValue> result)
+  {
+    /// <summary>
+    ///   Handler for the case of an <see cref="Outcome.Ok" /> outcome.
+    /// </summary>
+    /// <param name="handler">Action to perform on an Ok result. The parameter is the success value.</param>
+    [DebuggerStepThrough]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void OnOk(Action<TValue> handler)
+    {
+      if (result._outcome != Outcome.Ok) return;
+
+      handler(result._value);
+    }
+
+    /// <summary>
+    ///   Async handler for the case of an <see cref="Outcome.Ok" /> outcome.
+    /// </summary>
+    /// <param name="handler">Action to perform on an Ok result. The parameter is the success value.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    [DebuggerStepThrough]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Task OnOkAsync(Func<TValue, Task> handler, CancellationToken cancellationToken = default)
+    {
+      if (result._outcome != Outcome.Ok) return Task.CompletedTask;
+
+      cancellationToken.ThrowIfCancellationRequested();
+      return handler(result._value);
+    }
+  }
+
+  /// <summary>
+  ///   Stage for handling the Ok outcome of a <see cref="Result{T, T}" /> when a default value is provided in the case of
+  ///   failure.
+  /// </summary>
+  public readonly struct OkWithDefaultStage<TResultValue>(Result<TReason, TValue> result, TResultValue defaultValue)
+  {
+    /// <summary>
+    ///   Handler for the case of an <see cref="Outcome.Ok" /> outcome.
+    /// </summary>
+    /// <param name="handler">Action to perform on an Ok result. The parameter is the success value.</param>
+    [DebuggerStepThrough]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public TResultValue OnOk(Func<TValue, TResultValue> handler)
+    {
+      return result._outcome != Outcome.Ok ? defaultValue : handler(result._value);
+    }
+
+    /// <summary>
+    ///   Async handler for the case of an <see cref="Outcome.Ok" /> outcome.
+    /// </summary>
+    /// <param name="handler">Action to perform on an Ok result. The parameter is the success value.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    [DebuggerStepThrough]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Task<TResultValue> OnOkAsync(Func<TValue, Task<TResultValue>> handler,
+      CancellationToken cancellationToken = default)
+    {
+      if (result._outcome != Outcome.Ok) return Task.FromResult(defaultValue);
+
+      cancellationToken.ThrowIfCancellationRequested();
+      return handler(result._value);
+    }
   }
 }
 
 /// <summary>
-///   Utility that provides the capability to return a successful result, or in the case of failure, a failure reason.
+///   An Ok <see cref="Result" /> or <see cref="Result{T}" />.
 /// </summary>
-public static class Result
-{
-  /// <summary>
-  ///   Get an Ok result, does not contain Error information. Should be cast to <see cref="Result" />.
-  /// </summary>
-  /// <returns>An <see cref="OkResult" />.</returns>
-  public static OkResult Ok => OkResult.Ok;
-
-  /// <summary>
-  ///   Get an Error result with an error.
-  /// </summary>
-  /// <param name="error">The error.</param>
-  /// <typeparam name="TError">The type of the Error result.</typeparam>
-  /// <returns>An Ok result.</returns>
-  public static Result<TError> Error<TError>(TError error)
-  {
-    return Result<TError>.Error(error);
-  }
-}
+public readonly struct OkResult;
 
 /// <summary>
-///   Representative of an Ok result, regardless of the error type.
+///   An Error <see cref="Result" />.
 /// </summary>
-public readonly struct OkResult
-{
-  /// <summary>
-  ///   A read-only instance of an Ok result.
-  /// </summary>
-  public static OkResult Ok { get; } = new();
-}
+public readonly struct ErrorResult;

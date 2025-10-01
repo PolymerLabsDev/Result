@@ -16,8 +16,8 @@ public class ValueResultUnitTests
   [Test]
   public void ValueResult_When_DoesInvokeCorrectMethod()
   {
-    var okResult = ValueResult<int, TestError>.Ok(0);
-    var errorResult = ValueResult<int, TestError>.Error(TestError.FirstError);
+    var okResult = Result<int, TestError>.Ok(0);
+    var errorResult = Result<int, TestError>.Error(TestError.FirstError);
 
     const int errorValue = 20;
     const int okValue = 10;
@@ -42,8 +42,8 @@ public class ValueResultUnitTests
   {
     const int okValue = 10;
     const int errorValue = 10;
-    var okResult = ValueResult<int, TestError>.Ok(okValue);
-    var errorResult = ValueResult<int, TestError>.Error(TestError.FirstError);
+    var okResult = Result<int, TestError>.Ok(okValue);
+    var errorResult = Result<int, TestError>.Error(TestError.FirstError);
 
     var okMatchResult = okResult.When(
       _ => { },
@@ -66,8 +66,8 @@ public class ValueResultUnitTests
     const int okSetValue = 20;
     const TestError errorSetValue = TestError.SecondError;
 
-    var okResult = ValueResult<int, TestError>.Ok(okSetValue);
-    var errorResult = ValueResult<int, TestError>.Error(errorSetValue);
+    var okResult = Result<int, TestError>.Ok(okSetValue);
+    var errorResult = Result<int, TestError>.Error(errorSetValue);
 
     int? retrievedOkValue = null;
     okResult.When(
@@ -99,8 +99,8 @@ public class ValueResultUnitTests
   [Test]
   public void ValueResult_When_DoesReturnValueOfDifferentType()
   {
-    var okResult = ValueResult<int, TestError>.Ok(0);
-    var errorResult = ValueResult<int, TestError>.Error(TestError.FirstError);
+    var okResult = Result<int, TestError>.Ok(0);
+    var errorResult = Result<int, TestError>.Error(TestError.FirstError);
 
     const string errorValue = "20";
     const string okValue = "10";
@@ -124,8 +124,8 @@ public class ValueResultUnitTests
   public void ValueResult_WhenError_OnlyCalledWhenError()
   {
     const int okValue = 10;
-    var okResult = ValueResult<int, TestError>.Ok(okValue);
-    var errorResult = ValueResult<int, TestError>.Error(TestError.FirstError);
+    var okResult = Result<int, TestError>.Ok(okValue);
+    var errorResult = Result<int, TestError>.Error(TestError.FirstError);
 
     const int errorValue = 10;
     var errorMatchResult = errorResult.WhenError(_ => errorValue);
@@ -142,7 +142,7 @@ public class ValueResultUnitTests
   public void ValueResult_WhenError_DoesPassError()
   {
     const TestError error = TestError.SecondError;
-    var result = ValueResult<int, TestError>.Error(TestError.SecondError);
+    var result = Result<int, TestError>.Error(TestError.SecondError);
 
 
     var retrievedError = TestError.FirstError;
@@ -160,8 +160,8 @@ public class ValueResultUnitTests
   {
     const int okValue = 5;
     const int errorValue = 10;
-    var okResult = ValueResult.Ok<int, TestError>(okValue);
-    var errorResult = ValueResult.Error<int, TestError>(TestError.SecondError);
+    var okResult = Result<,>.Ok<int, TestError>(okValue);
+    var errorResult = Result<,>.Error<int, TestError>(TestError.SecondError);
 
     var okMatchResult = okResult.When(
       _ => okValue,
@@ -183,13 +183,13 @@ public class ValueResultUnitTests
     const int okValue = 5;
     const int errorValue = 10;
 
-    ValueResult<int, TestError> okValueResult = okValue;
-    ValueResult<int, TestError> errorValueResult = TestError.SecondError;
+    Result<int, TestError> okResult = okValue;
+    Result<int, TestError> errorResult = TestError.SecondError;
 
-    var okMatchResult = okValueResult.When(
+    var okMatchResult = okResult.When(
       _ => okValue,
       _ => throw new UnreachableException());
-    var errorMatchResult = errorValueResult.When(
+    var errorMatchResult = errorResult.When(
       _ => throw new UnreachableException(),
       _ => errorValue);
 
